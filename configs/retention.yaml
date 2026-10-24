@@ -1,0 +1,5 @@
+# Retention periods per applicant jurisdiction, in days. These are placeholders:
+# set them with counsel for each jurisdiction you hire in (SPEC.md, Prerequisite).
+default_days: 365
+jurisdictions:
+  unknown: 365

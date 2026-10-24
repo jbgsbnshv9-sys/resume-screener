@@ -22,7 +22,7 @@ These aren't preferences; the system's integrity depends on them.
 3. **Every score above level 0 must cite evidence.** Evidence quotes are verified in code against the source text. A score whose evidence can't be verified is invalid and gets flagged. Level 0 means "no supporting evidence found" and requires no quote.
 4. **Aggregation happens in code, never in the model.**
 5. **Every candidate in a requisition is scored under the same pinned config version.** Config versions are immutable once created. A config is pinned to a requisition when its first candidate is scored and stays pinned for the requisition's life. Changing it requires re-scoring every open candidate in that requisition under the new config.
-6. **Every LLM call is recorded, and everything downstream of the LLM is recomputable.** Store the model ID, prompt hash, config hash, temperature, raw responses, and parsed outputs. Sampled LLM output can't be replayed, but verification, medians, aggregation, and tiers must be exactly recomputable from stored data.
+6. **Every LLM call is recorded, and everything downstream of the LLM is recomputable.** Store the model ID, prompt hash, config hash, effort setting, raw responses, and parsed outputs. Sampled LLM output can't be replayed, but verification, medians, aggregation, and tiers must be exactly recomputable from stored data.
 7. **Real resumes never appear in the repo, fixtures, tests, or development.** Use synthetic data only. Consented real resumes, if any, live only in a separate, access-controlled eval store.
 8. **Models return quotes; code computes spans.** LLMs are unreliable at character offsets. Any field that points into the source text is returned by the model as a verbatim substring, and the span is found deterministically in code.
 
@@ -99,14 +99,14 @@ intake:
   on_hidden_text: flag_for_review
 parse:
   model: claude-haiku-5-5
-  temperature: 0
+  effort: low
 redact:
   fields: [name, contact, photo, address, links]
   optional: [school_names]
   free_text: { neutralize_pronouns: true, term_lists: [affinity_orgs] }
 score:
   model: claude-sonnet-5-5
-  temperature: 0.3
+  effort: medium
   samples: 3
   instability_threshold: 1      # max level spread before flagging
   flag_tier_straddle: true      # also flag when samples straddle a tier boundary
@@ -119,7 +119,9 @@ review:
   blind_first_look: false
 ```
 
-Configs are content-hashed and immutable. Each one moves through the states draft → validated → active → retired. Only one config can be active per role, and only an admin can promote one. Promotion requires a passing eval run on that exact config hash. Promoting a new config doesn't change requisitions that are already pinned (principle 5).
+There is no `temperature`: Messages API version 2026-10-21 rejects `temperature`, `top_p` and `top_k` on every model, so configs that set them fail validation. Sample-to-sample variation comes from default sampling, and `effort` is the tunable.
+
+A config's hash covers the YAML, the rubric content, every prompt template, and every term list it uses. Configs are content-hashed and immutable. Each one moves through the states draft → validated → active → retired. Only one config can be active per role, and only an admin can promote one. Promotion requires a passing eval run on that exact config hash. Promoting a new config doesn't change requisitions that are already pinned (principle 5).
 
 **Model deprecation.** When a model referenced by a pinned config is scheduled for retirement, the system raises an alert on every affected open requisition. The resolution is a new config that passes the eval gate, followed by a full re-score of the requisition's open candidates. Candidates are never silently re-scored under a different model.
 
@@ -207,17 +209,23 @@ All users authenticate, and every API route enforces role-based access. The reda
 
 ```
 /backend
-  /pipeline        # one module per node, each a pure function + Pydantic I/O
-  /prompts         # versioned prompt templates (hashed at load)
-  /evals           # golden set loader, counterfactual generator, metrics
-  /lint            # rubric proxy-risk lint
-  /cli
-  /api
-  /models          # SQLAlchemy
-  /jobs
+  /screener
+    /pipeline      # one module per node, each a pure function + Pydantic I/O
+    /prompts       # versioned prompt templates (hashed at load)
+    /evals         # eval set builder, counterfactual generator, metrics, gate, diff
+    /lint          # rubric proxy-risk lint
+    /synthetic     # synthetic personas and renderers (PDF, DOCX, adversarial variants)
+    /cli
+    /api
+    /models        # SQLAlchemy
+    llm.py         # model clients: Anthropic, cassette record/replay
+    simulated.py   # deterministic offline stand-in model (dev and tests only)
+    services.py    # review rules, pinning, promotion, export, retention
+  /migrations      # Alembic
+  /tests
 /frontend
-/fixtures          # synthetic resumes, injection fixtures, counterfactual seeds, messy-layout fixtures
-/configs           # example rubric + pipeline YAMLs
+/fixtures          # committed synthetic eval set and sample documents
+/configs           # rubrics, pipeline configs, term lists, gate thresholds, retention
 SPEC.md
 CLAUDE.md
 ```

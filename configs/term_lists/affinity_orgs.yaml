@@ -1,0 +1,12 @@
+name: affinity_orgs
+# Organizations whose membership signals a protected characteristic. Redacted from
+# free text before scoring. The counterfactual suite measures what this misses.
+terms:
+  - Society of Women Engineers
+  - Women in Engineering
+  - National Society of Black Engineers
+  - Society of Hispanic Professional Engineers
+  - Muslim Students Association
+  - Hillel
+  - Out in Tech
+  - Veterans in Tech

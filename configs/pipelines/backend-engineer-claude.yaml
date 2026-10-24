@@ -1,0 +1,23 @@
+# Live config. No temperature: API version 2026-10-21 rejects sampling parameters,
+# so sample variation comes from default sampling and `effort` is the knob.
+rubric: backend-engineer-2026q4@v1
+intake:
+  min_font_pt: 4
+  color_delta_threshold: 0.05
+  on_hidden_text: flag_for_review
+parse:
+  model: claude-haiku-5-5
+  effort: low
+redact:
+  fields: [name, contact, photo, address, links]
+  optional: []
+  free_text: {neutralize_pronouns: true, term_lists: [affinity_orgs]}
+score:
+  model: claude-sonnet-5-5
+  effort: medium
+  samples: 3
+  instability_threshold: 1
+  flag_tier_straddle: true
+aggregate:
+  tiers: {strong: 0.75, review: 0.45}
+  must_have_cap: review

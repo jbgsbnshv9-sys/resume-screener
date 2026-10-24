@@ -1,0 +1,35 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: screener
+      POSTGRES_PASSWORD: screener
+      POSTGRES_DB: screener
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U screener"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://screener:screener@db:5432/screener
+      # Set SCREENER_LIVE_LLM=1 and ANTHROPIC_API_KEY to run configs that use real models.
+      SCREENER_LIVE_LLM: ${SCREENER_LIVE_LLM:-0}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - blobs:/data/blobs
+    ports:
+      - "8000:8000"
+
+volumes:
+  pgdata:
+  blobs:

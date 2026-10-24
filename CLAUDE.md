@@ -23,3 +23,16 @@ These apply in every session, whether or not the spec is open. If a task would v
 - Unit tests use recorded LLM responses. Live-model tests are behind a flag and don't run by default.
 - No PII in logs, error messages, or test output. Log hashed references.
 - The audit log is append-only. No code path updates or deletes audit rows.
+
+## Commands
+
+Run from `backend/` (the venv is `backend/.venv`; create it with `uv venv .venv && uv pip install -e ".[dev]"`).
+
+- `pytest -q`: full suite, offline (simulated model and recorded responses). Set `TEST_DATABASE_URL=postgresql+psycopg://...` to run the database tests against Postgres, including the append-only trigger.
+- `pytest -q --live`: also runs tests that call the real API (needs `ANTHROPIC_API_KEY`).
+- `screener run <file> --config ../configs/pipelines/backend-engineer-sim.yaml`: one document end to end.
+- `screener eval --config <yaml> --eval-set ../fixtures/evalsets/backend-engineer-v1.jsonl --out report.json`: eval suite and gate.
+- `screener diff before.json after.json`: version diff.
+- `docker compose up` (repo root): Postgres plus the API on :8000.
+
+Configs whose models start with `simulated-` use the offline stand-in in `screener/simulated.py`. They exist for development and tests and are never for real candidates.

@@ -1,0 +1,120 @@
+id: backend-engineer-2026q4
+version: 1
+role: backend-engineer
+criteria:
+  - id: backend_development
+    name: Backend service development
+    description: Builds and maintains production backend services or APIs in a general-purpose programming language.
+    weight: 3
+    must_have: true
+    tags: [technical]
+    job_relatedness: The role's core duty is building and operating the team's backend API services in Go and Python.
+    levels:
+      0:
+        description: "No evidence of building backend services or APIs."
+        example: "Only frontend or non-software work is described."
+      1:
+        description: "Minor scripting or bug fixes in backend code without ownership of a service."
+        example: "Fixed bugs in a Python script used internally."
+      2:
+        description: "Built and maintained backend API services or endpoints running in production."
+        example: "Implemented REST API endpoints in a Java service used by customers."
+      3:
+        description: "Designed and owned production backend services end to end, or led a backend rewrite, with measured impact."
+        example: "Designed and owned a Go service serving thousands of requests per second through on-call."
+  - id: distributed_systems
+    name: Distributed systems
+    description: Works on systems spread across multiple services or machines, such as messaging, event streams, replication, or consistency.
+    weight: 2
+    tags: [technical]
+    job_relatedness: Our order pipeline is event-driven across services; engineers change consumers and replication logic weekly.
+    levels:
+      0:
+        description: "No evidence of work on distributed or multi-service systems."
+        example: "Only single-process applications are described."
+      1:
+        description: "Used a distributed component such as a message queue without designing for failure."
+        example: "Read messages from a queue in a batch job."
+      2:
+        description: "Built event-driven or multi-service components that handle retries, idempotency, or failures."
+        example: "Built consumers with idempotent processing and retries."
+      3:
+        description: "Designed distributed systems with explicit consistency, partitioning, leader election, or exactly-once delivery."
+        example: "Designed a replicated scheduler with leader election across regions."
+  - id: data_storage
+    name: Data storage and databases
+    description: Designs, queries, and operates databases, including schemas, indexes, SQL, and query performance.
+    weight: 2
+    tags: [technical]
+    job_relatedness: Engineers own the PostgreSQL schemas and query performance for the services they build.
+    levels:
+      0:
+        description: "No evidence of database or SQL work."
+        example: "No mention of databases or queries."
+      1:
+        description: "Wrote SQL queries or used a database without design responsibility."
+        example: "Wrote SQL queries for reports."
+      2:
+        description: "Designed database schemas or indexes and optimized queries for a service."
+        example: "Designed PostgreSQL schemas and indexes and optimized slow queries."
+      3:
+        description: "Led database migrations, sharding, or schema redesign, or owned database performance with measured impact."
+        example: "Led a zero-downtime migration of a large database to a sharded cluster."
+  - id: reliability_operations
+    name: Reliability and operations
+    description: Keeps production services reliable through monitoring, alerts, on-call, incident response, and deployment pipelines.
+    weight: 1.5
+    tags: [technical]
+    job_relatedness: Every engineer joins the on-call rotation for the services the team operates.
+    levels:
+      0:
+        description: "No evidence of operating production systems."
+        example: "No mention of monitoring, on-call, or deployment."
+      1:
+        description: "Took part in on-call or operations without owning tooling or response."
+        example: "Joined an on-call rotation."
+      2:
+        description: "Added monitoring, dashboards, or alerts and responded to production incidents."
+        example: "Added alerts for services and responded to incidents on-call."
+      3:
+        description: "Ran incident response and postmortems or built deployment pipelines with automated rollback."
+        example: "Ran postmortems for outages and built the deployment pipeline."
+  - id: testing_quality
+    name: Testing and code quality
+    description: Writes automated tests and improves code quality through testing practice and code review.
+    weight: 1
+    tags: [technical]
+    job_relatedness: The team ships continuously and relies on automated tests in CI to catch regressions.
+    levels:
+      0:
+        description: "No evidence of automated testing."
+        example: "No mention of tests."
+      1:
+        description: "Wrote some unit tests for own changes."
+        example: "Wrote unit tests for new features."
+      2:
+        description: "Added integration or contract tests to CI and improved coverage of critical paths."
+        example: "Added integration tests to the CI pipeline."
+      3:
+        description: "Built a testing strategy including load or property-based tests and set code review standards."
+        example: "Built the team's testing strategy and review standards."
+  - id: collaboration_mentorship
+    name: Collaboration and mentorship
+    description: Works with other engineers and teams, including mentoring, code review, design review, and planning.
+    weight: 1
+    tags: [collaboration]
+    job_relatedness: Senior engineers on the team mentor newer engineers and run design reviews.
+    levels:
+      0:
+        description: "No evidence of collaboration or mentoring."
+        example: "No mention of working with others."
+      1:
+        description: "Participated in team planning or meetings."
+        example: "Participated in sprint planning."
+      2:
+        description: "Mentored engineers through code review or pairing."
+        example: "Mentored junior engineers through pairing sessions."
+      3:
+        description: "Mentored several engineers and ran design review or cross-team technical planning."
+        example: "Ran the design review process and coordinated cross-team planning."
+lint_acknowledgments: []
