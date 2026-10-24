@@ -338,6 +338,8 @@ def record_review_event(session: Session, application_id: str, user: User, event
     _require_reviewer_for(session, user, app)
     if event not in ("opened", "viewed_page", "scores_revealed", "closed"):
         raise ServiceError(400, "unknown review event")
+    if event == "scores_revealed" and not any(e.event == "opened" for e in events_for(session, app.id, user.id)):
+        raise ServiceError(409, "open the document before revealing scores")
     ev = ReviewEvent(application_id=app.id, reviewer_id=user.id, event=event, detail=detail or {})
     session.add(ev)
     if event == "opened" and app.status == "pending":
@@ -346,7 +348,7 @@ def record_review_event(session: Session, application_id: str, user: User, event
     return ev
 
 
-def _events(session: Session, application_id: str, reviewer_id: str | None = None) -> list[ReviewEvent]:
+def events_for(session: Session, application_id: str, reviewer_id: str | None = None) -> list[ReviewEvent]:
     q = select(ReviewEvent).where(ReviewEvent.application_id == application_id)
     if reviewer_id:
         q = q.where(ReviewEvent.reviewer_id == reviewer_id)
@@ -366,7 +368,7 @@ def record_decision(session: Session, application_id: str, user: User, decision:
         raise ServiceError(400, "decision must be advance, hold, or decline")
     if not reason or not reason.strip():
         raise ServiceError(400, "a reason is required")
-    if not any(e.event == "opened" for e in _events(session, app.id, user.id)):
+    if not any(e.event == "opened" for e in events_for(session, app.id, user.id)):
         raise ServiceError(409, "open the candidate's document before recording a decision")
     run = None if app.ai_opt_out else latest_run(session, app.id)
     d = Decision(application_id=app.id, run_id=run.id if run else None, reviewer_id=user.id, decision=decision, reason=reason.strip(), suggested_tier=run.tier if run else None, override=override)
@@ -381,11 +383,11 @@ def _ai_visible(session: Session, app: Application, user: User, blind: bool) -> 
     if app.ai_opt_out:
         return False
     if blind and user.role == "reviewer":
-        return any(e.event == "scores_revealed" for e in _events(session, app.id, user.id))
+        return any(e.event == "scores_revealed" for e in events_for(session, app.id, user.id))
     return True
 
 
-def _review_config(session: Session, req: Requisition):
+def review_config(session: Session, req: Requisition):
     row = session.get(PipelineConfigRow, req.pinned_config_hash) if req.pinned_config_hash else None
     if row is None:
         from screener.config import ReviewConfig
@@ -400,13 +402,13 @@ def review_queue(session: Session, requisition_id: str, user: User) -> list[dict
         raise ServiceError(404, "requisition not found")
     if user.role == "reviewer" and not is_assigned(session, user, req.id):
         raise ServiceError(403, "not assigned to this requisition")
-    rcfg = _review_config(session, req)
+    rcfg = review_config(session, req)
     items = []
     for app in session.scalars(select(Application).where(Application.requisition_id == req.id)):
         run = latest_run(session, app.id)
         visible = _ai_visible(session, app, user, rcfg.blind_first_look)
         flags = [f.type for f in session.scalars(select(FlagRow).where(FlagRow.run_id == run.id))] if run else []
-        opened = any(e.event == "opened" for e in _events(session, app.id))
+        opened = any(e.event == "opened" for e in events_for(session, app.id))
         due = _aware(app.applied_at) + timedelta(days=rcfg.open_sla_days)
         items.append(
             {
@@ -437,9 +439,9 @@ def alerts(session: Session, now: datetime | None = None) -> list[dict[str, Any]
     now = now or utcnow()
     out = []
     for req in session.scalars(select(Requisition).where(Requisition.status == "open")):
-        rcfg = _review_config(session, req)
+        rcfg = review_config(session, req)
         for app in session.scalars(select(Application).where(Application.requisition_id == req.id, Application.status != "decided")):
-            opened = any(e.event == "opened" for e in _events(session, app.id))
+            opened = any(e.event == "opened" for e in events_for(session, app.id))
             if not opened and now > _aware(app.applied_at) + timedelta(days=rcfg.open_sla_days):
                 out.append({"type": "not_opened", "application_id": app.id, "requisition_id": req.id, "since": app.applied_at.isoformat()})
             last = session.scalars(select(Decision).where(Decision.application_id == app.id).order_by(Decision.at.desc())).first()
@@ -457,7 +459,7 @@ def reviewer_metrics(session: Session) -> list[dict[str, Any]]:
             continue
         durations = []
         for d in decisions:
-            opened = [e for e in _events(session, d.application_id, user.id) if e.event == "opened" and _aware(e.at) <= _aware(d.at)]
+            opened = [e for e in events_for(session, d.application_id, user.id) if e.event == "opened" and _aware(e.at) <= _aware(d.at)]
             if opened:
                 durations.append((_aware(d.at) - _aware(opened[0].at)).total_seconds())
         with_tier = [d for d in decisions if d.suggested_tier]
@@ -493,6 +495,12 @@ def run_trace(session: Session, run_id: str, user: User) -> dict[str, Any]:
 
     result = RunResult.model_validate(run.result)
     hide_ai = bool(app and app.ai_opt_out)
+    blind = False
+    if app is not None and user.role == "reviewer":
+        req = session.get(Requisition, app.requisition_id)
+        blind = review_config(session, req).blind_first_look and not any(e.event == "scores_revealed" for e in events_for(session, app.id, user.id))
+    hidden_reason = "candidate opted out of AI screening" if hide_ai else "blind first look: reveal scores after reading the document"
+    hide_ai = hide_ai or blind
     nodes = list(session.scalars(select(NodeOutputRow).where(NodeOutputRow.run_id == run.id).order_by(NodeOutputRow.seq)))
     return {
         "run_id": run.id,
@@ -502,6 +510,7 @@ def run_trace(session: Session, run_id: str, user: User) -> dict[str, Any]:
         "status": run.status,
         "stop_reason": run.stop_reason,
         "ai_hidden": hide_ai,
+        "blind": blind,
         "tier": None if hide_ai else run.tier,
         "weighted_score": None if hide_ai else run.weighted_score,
         "aggregate": None if hide_ai or result.aggregate is None else result.aggregate.model_dump(mode="json"),
@@ -515,7 +524,7 @@ def run_trace(session: Session, run_id: str, user: User) -> dict[str, Any]:
                 "node": n.node,
                 "input_hash": n.input_hash,
                 "config": n.config,
-                "output": n.output if not (hide_ai and n.node in ("score", "aggregate")) else {"hidden": "candidate opted out of AI screening"},
+                "output": n.output if not (hide_ai and n.node in ("score", "aggregate")) else {"hidden": hidden_reason},
                 "models": n.models,
                 "prompt_hashes": n.prompt_hashes,
                 "input_tokens": n.input_tokens,
@@ -552,7 +561,7 @@ def export_application(session: Session, application_id: str, user: User) -> dic
     req = session.get(Requisition, app.requisition_id)
     runs = list(session.scalars(select(Run).where(Run.application_id == app.id).order_by(Run.started_at)))
     configs = {r.config_hash: session.get(PipelineConfigRow, r.config_hash) for r in runs}
-    events = _events(session, app.id)
+    events = events_for(session, app.id)
     decisions = list(session.scalars(select(Decision).where(Decision.application_id == app.id).order_by(Decision.at)))
     consents = list(session.scalars(select(ConsentRecord).where(ConsentRecord.application_id == app.id)))
     notices = list(session.scalars(select(CandidateNotice).where(CandidateNotice.application_id == app.id)))

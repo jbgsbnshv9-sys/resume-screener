@@ -18,8 +18,8 @@ These apply in every session, whether or not the spec is open. If a task would v
 ## Working conventions
 
 - One milestone per session. Plan before writing code, and confirm the plan against the milestone's "done when" column in `SPEC.md`.
-- Each pipeline node is a pure function with Pydantic input and output, in `backend/pipeline/`, and writes a `NodeOutput`.
-- Prompts live in `backend/prompts/` and are hashed at load. Changing a prompt changes the hash, so never edit a prompt in place to fix a stored run.
+- Each pipeline node is a pure function with Pydantic input and output, in `backend/screener/pipeline/`, and writes a `NodeOutput`.
+- Prompts live in `backend/screener/prompts/` and are hashed at load. Changing a prompt changes the hash, so never edit a prompt in place to fix a stored run.
 - Unit tests use recorded LLM responses. Live-model tests are behind a flag and don't run by default.
 - No PII in logs, error messages, or test output. Log hashed references.
 - The audit log is append-only. No code path updates or deletes audit rows.
