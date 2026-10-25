@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -13,6 +14,9 @@ from screener.config import load_config
 from screener.llm import LLMRequest, LLMResponse, default_provider, response_from_raw
 
 CONFIGS = settings.REPO_ROOT / "configs"
+# DOCX intake renders through LibreOffice; the Docker image installs it. Tests that need the
+# conversion skip (with this reason) only where it isn't installed; the fallback is tested everywhere.
+requires_soffice = pytest.mark.skipif(not (shutil.which("soffice") or shutil.which("libreoffice")), reason="LibreOffice not installed")
 SIM_CONFIG = CONFIGS / "pipelines" / "backend-engineer-sim.yaml"
 
 

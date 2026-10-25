@@ -11,7 +11,7 @@ from sqlalchemy.orm import sessionmaker
 from screener import services
 from screener.evals.evalset import build_eval_set, save_eval_set
 from screener.models.db import AppendOnlyViolation, Application, AuditLog, Candidate, Document, RedactionMapRow, Run
-from tests.conftest import SIM_CONFIG
+from tests.conftest import SIM_CONFIG, requires_soffice
 
 SIM_YAML = SIM_CONFIG.read_text()
 
@@ -289,6 +289,7 @@ def test_retention_purge(env, fixture_files):
         s.commit()
 
 
+@requires_soffice
 def test_zip_import_with_manifest(env, fixture_files):
     client, h, _ = env
     _, req = _setup_requisition(client, h)

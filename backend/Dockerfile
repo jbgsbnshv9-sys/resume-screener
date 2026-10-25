@@ -1,3 +1,10 @@
+FROM node:22-slim AS frontend
+WORKDIR /app/frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY frontend/ ./
+RUN npm run build
+
 FROM python:3.12-slim
 
 # LibreOffice (headless writer) converts DOCX to PDF for intake; DejaVu gives it fonts.
@@ -14,6 +21,7 @@ COPY backend/migrations ./migrations
 COPY backend/tests ./tests
 COPY configs /app/configs
 COPY fixtures /app/fixtures
+COPY --from=frontend /app/frontend/dist /app/frontend/dist
 
 ENV SCREENER_CONFIGS_DIR=/app/configs \
     SCREENER_BLOB_DIR=/data/blobs \

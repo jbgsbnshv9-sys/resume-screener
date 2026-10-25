@@ -40,3 +40,26 @@ def write_fixtures(out: Path, seed: int = 11) -> list[Path]:
         path.write_bytes(data)
         paths.append(path)
     return paths
+
+
+def demo_files(seed: int = 21) -> dict[str, bytes]:
+    """One distinct synthetic person per file, covering each review situation."""
+    rng = random.Random(seed)
+    plan = [
+        ("strong_1.pdf", "strong", RenderOptions()),
+        ("strong_2_two_column.pdf", "strong", RenderOptions(layout="two_column")),
+        ("review_1.pdf", "review", RenderOptions()),
+        ("review_2.docx", "review", None),
+        ("weak_1.pdf", "weak", RenderOptions()),
+        ("hidden_white_text.pdf", "weak", RenderOptions(hidden=["white", "metadata"])),
+        ("visible_injection.pdf", "weak", RenderOptions()),
+        ("scanned_image_only.pdf", "review", RenderOptions(image_only=True)),
+        ("opt_out_candidate.pdf", "review", RenderOptions()),
+    ]
+    files: dict[str, bytes] = {}
+    for i, (name, tier, options) in enumerate(plan):
+        p = generate_persona(f"demo-{i}", tier, rng)
+        if name.startswith("visible_injection"):
+            p = p.model_copy(update={"summary": VISIBLE_INJECTION})
+        files[name] = render_docx(p) if options is None else render_pdf(p, options)
+    return files

@@ -2,6 +2,7 @@ from screener.config import derive_config
 from screener.pipeline.recompute import recompute
 from screener.pipeline.runner import RunStatus, evidence_locations, run_pipeline
 from screener.pipeline.types import FlagType
+from tests.conftest import requires_soffice
 
 
 def test_end_to_end_clean_resume(fixture_files, sim_config, provider):
@@ -61,8 +62,19 @@ def test_recompute_matches_and_detects_tampering(fixture_files, sim_config, prov
     assert not recompute(run, other).matches
 
 
+@requires_soffice
 def test_docx_runs_through_libreoffice_conversion(fixture_files, sim_config, provider):
     run, artifacts = run_pipeline(fixture_files["clean_strong.docx"], "r.docx", sim_config, provider)
     assert run.intake.converted_from_docx
     assert artifacts.render_pdf[:5] == b"%PDF-"
     assert run.aggregate.tier == "strong"
+
+
+def test_docx_without_libreoffice_goes_to_manual_review(fixture_files, sim_config, provider, monkeypatch):
+    import screener.pipeline.intake as intake
+
+    monkeypatch.setattr(intake.shutil, "which", lambda name: None)
+    run, artifacts = run_pipeline(fixture_files["hidden_runs.docx"], "r.docx", sim_config, provider)
+    assert run.status == RunStatus.MANUAL_REVIEW and artifacts.render_pdf is None
+    assert {f.type for f in run.flags} >= {FlagType.UNSUPPORTED_FILE, FlagType.HIDDEN_TEXT}
+    assert "Kubernetes Kafka distributed" not in run.intake.visible_text

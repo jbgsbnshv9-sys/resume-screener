@@ -1,0 +1,1 @@
+{"root":["./src/App.tsx","./src/api.ts","./src/main.tsx","./src/components/PdfViewer.tsx","./src/components/ui.tsx","./src/pages/Audit.tsx","./src/pages/Candidate.tsx","./src/pages/Configs.tsx","./src/pages/Diff.tsx","./src/pages/Queue.tsx","./vite.config.ts"],"version":"5.9.3"}

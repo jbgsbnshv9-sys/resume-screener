@@ -229,6 +229,49 @@ def cmd_purge(args) -> int:
     return 0
 
 
+def cmd_demo(args) -> int:
+    """Seed a demo instance with synthetic data: users, an eval-gated config, a requisition, fixture resumes."""
+    from screener.config import load_config
+    from screener.evals.evalset import load_eval_set
+    from screener.evals.gate import evaluate_gate, load_gate
+    from screener.evals.runner import run_eval
+    from screener.models.session import session_scope
+    from screener.services import assign_reviewer, create_requisition, create_user, promote_config, register_config, store_eval_run, submit_application
+    from screener.synthetic.fixtures import demo_files
+
+    config_path = Path(args.config)
+    loaded = load_config(config_path)
+    tokens = {}
+    with session_scope() as s:
+        users = {}
+        for email, role in [("admin@example.com", "admin"), ("owner@example.com", "rubric_owner"), ("reviewer@example.com", "reviewer"), ("auditor@example.com", "auditor")]:
+            users[role], tokens[role] = create_user(s, email, email.split("@")[0].title(), role, "demo")
+        register_config(s, config_path.read_text(), users["rubric_owner"].email)
+    print("running the eval suite (synthetic, simulated model)...", file=sys.stderr)
+    report = run_eval(load_eval_set(Path(args.eval_set)), loaded, _provider(args), repeats=2)
+    report.gate = evaluate_gate(report, load_gate(settings.REPO_ROOT / "configs" / "evals" / "default-gate.yaml"))
+    with session_scope() as s:
+        store_eval_run(s, report, "owner@example.com")
+    if not report.gate.passed:
+        print("eval gate failed; config not promoted", file=sys.stderr)
+        print(json.dumps({"tokens": tokens}, indent=2))
+        return 2
+    with session_scope() as s:
+        from screener.models.db import User
+
+        admin = s.get(User, users["admin"].id)
+        promote_config(s, loaded.hash, admin)
+        req = create_requisition(s, loaded.rubric.role, "BE-DEMO-1", admin.email)
+        assign_reviewer(s, users["reviewer"].id, req.id, admin.email)
+        req_id = req.id
+    # Distinct synthetic people per file, so dedup doesn't fold them into resubmissions.
+    for name, data in demo_files().items():
+        with session_scope() as s:
+            submit_application(s, requisition_id=req_id, data=data, filename=name, actor="admin@example.com", provider=_provider(args), notice_version="demo", ai_opt_out=name.startswith("opt_out"))
+    print(json.dumps({"config_hash": loaded.hash, "requisition_id": req_id, "tokens": tokens}, indent=2))
+    return 0
+
+
 def cmd_serve(args) -> int:
     import uvicorn
 
@@ -312,6 +355,12 @@ def build_parser() -> argparse.ArgumentParser:
     uc.set_defaults(fn=cmd_user_create)
 
     sub.add_parser("purge", help="delete candidates past their retention date").set_defaults(fn=cmd_purge)
+
+    demo = sub.add_parser("demo", help="seed a demo instance with synthetic data (prints API tokens)")
+    demo.add_argument("--config", default=str(settings.REPO_ROOT / "configs" / "pipelines" / "backend-engineer-sim.yaml"))
+    demo.add_argument("--eval-set", default=str(settings.REPO_ROOT / "fixtures" / "evalsets" / "backend-engineer-v1.jsonl"))
+    _add_llm_args(demo)
+    demo.set_defaults(fn=cmd_demo)
 
     sv = sub.add_parser("serve", help="run the API server")
     sv.add_argument("--host", default="127.0.0.1")
